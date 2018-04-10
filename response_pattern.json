@@ -1,0 +1,15 @@
+{
+  "version": "string",
+  "requestId": "string",
+  "response": {
+    "outputSpeech": "string",
+    "reprompt": {
+      "outputSpeech": "string"
+    },
+    "directives": [
+      {
+      }
+    ],
+    "shouldEndSession": false
+  }
+}
