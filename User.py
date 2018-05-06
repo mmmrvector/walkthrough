@@ -1,30 +1,52 @@
 from enum import Enum
 
-Intent = Enum('Intent',('Query', 'NextStep', 'Repeat', 'AskPos'))
+Intent = Enum('Intent',('Start', 'Exit', 'Unclear', 'Query', 'NextStep', 'Repeat', 'AskPos', 'QueryRole'))
+
+class NotExistError(Exception):
+    def __init__(self, ErrorInfo):
+        super().__init__(self)
+        self.errorinfo = ErrorInfo
+    def __str__(self):
+        return self.errorinfo
+class NextNullError():
+    def __init__(self, ErrorInfo):
+        super().__init__(self)
+        self.errorinfo = ErrorInfo
+    def __str__(self):
+        return self.errorinfo
+
 class Record(object):
     """docString"""
-    #info内容：(game, level, mission, step)/(game, chara)
+    #info内容：(game, level, mission, step)/(game, chara, kind)
     def __init__(self, *info):
-        if len(info) == 2:
+        self.setInfo(*info)
+    def __str__(self):
+        if self.type == 0:
+            return self.game + '的' + self.chara + '的' + self.kind
+        elif self.type == 1:
+            return self.game + '的第' + str(self.level) + '章第' + str(self.mission) + '关的第' + str(self.step) + '步'
+    def setInfo(self, *info):
+        if len(info) == 3:
             self.type = 0           #网游类
             self.game = info[0]
             self.chara = info[1]
+            self.kind = info[2]
         elif len(info) == 4:
             self.type = 1           #流程类
             self.game = info[0]
             self.level = info[1]
-            self.levellength = 2    #从数据库以game为键取
             self.mission = info[2]
-            self.missionlength = 2  #从数据库以game为键取
             self.step = info[3]
-            self.steplength = 2     #从数据库以game为键取
+
+            gameData = Game(self.game)
+            self.levellength, self.missionlength, self.steplength =
+                gameData.getLens(self.level, self.mission, self.step)
+            if self.levellength == None:
+                raise NotExistError('查询的关卡不存在')
         else:
             raise ValueError('Wrong Arguments')
-    def __str__(self):
-        if self.type == 0:
-            return self.game + '的' + self.chara
-        elif self.type == 1:
-            return self.game + '的第' + str(self.level) + '章第' + str(self.mission) + '关的第' + str(self.step) + '步'
+    def setKind(self, kind):
+        self.kind = kind
     def update(self):
         if self.type == 0:
             raise AttributeError()
@@ -53,6 +75,7 @@ class User(object):
     def __query(self, info):
         game = info[0]
         if game in self.__records:
+            self.__records[game].setInfo(*info)
             self.__currecord = self.__records[game]
             return self.__records[game]
         else:
@@ -63,17 +86,24 @@ class User(object):
         if self.__currecord.update() == True:
             return self.__currecord
         else:
-            return None
+            raise NextNullError('没有下一步了')
     def __repeat(self, info):
         return self.__currecord
-    def __askpos(self, info):
-        return self.__currecord
+    def __queryrole(self, info):
+        if info[0] == None:
+            self.__currecord.setKind(info[2])
+            return self.__currecord
+        else:
+            self.__currecord = Record(*info)
+            self.__records[info[0]] = self.__currecord
+            return self.__currecord
     def getUserRecord(self, intent, info):
         methoddict = {
             Intent.Query: self.__query,
             Intent.NextStep: self.__nextstep,
             Intent.Repeat: self.__repeat,
-            Intent.AskPos: self.__askpos
+            Intent.AskPos: self.__repeat,
+            Intent.QueryRole: self.__queryrole
         }
         return methoddict[intent](info)
 
